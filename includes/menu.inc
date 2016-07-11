@@ -317,7 +317,7 @@ define('MENU_PREFERRED_LINK', '1cf698d64d1aa4b83907cf6ed55db3a7f8e92c91');
  * actually exists. This list of 'masks' is built in menu_rebuild().
  *
  * @param $parts
- *   An array of path parts; for the above example, 
+ *   An array of path parts; for the above example,
  *   array('node', '12345', 'edit').
  *
  * @return
@@ -2927,7 +2927,9 @@ function _menu_navigation_links_rebuild($menu) {
   }
   $paths = array_keys($menu);
   // Updated and customized items whose router paths are gone need new ones.
-  $result = db_select('menu_links', NULL, array('fetch' => PDO::FETCH_ASSOC))
+  // Also as Oracle 11g donot support over 1000 in an expression. Fixed using array_chunck() with 900.
+  // For more info on Oracle issue, visit @ https://www.drupal.org/node/1804084
+  $query = db_select('menu_links', NULL, array('fetch' => PDO::FETCH_ASSOC))
     ->fields('menu_links', array(
       'link_path',
       'mlid',
@@ -2935,14 +2937,16 @@ function _menu_navigation_links_rebuild($menu) {
       'updated',
     ))
     ->condition(db_or()
-      ->condition('updated', 1)
-      ->condition(db_and()
-        ->condition('router_path', $paths, 'NOT IN')
-        ->condition('external', 0)
-        ->condition('customized', 1)
-      )
-    )
-    ->execute();
+      ->condition('updated', 1));
+    foreach(array_chunk($paths, 900, true) as $paths_chunk) {
+      $query->condition(db_and()
+        ->condition('router_path', $paths_chunk, 'NOT IN'));
+    }
+    $query->condition(db_and()
+          ->condition('external', 0)
+          ->condition('customized', 1));
+  $result = $query->execute();
+
   foreach ($result as $item) {
     $router_path = _menu_find_router_path($item['link_path']);
     if (!empty($router_path) && ($router_path != $item['router_path'] || $item['updated'])) {
@@ -2959,15 +2963,19 @@ function _menu_navigation_links_rebuild($menu) {
     }
   }
   // Find any item whose router path does not exist any more.
-  $result = db_select('menu_links')
-    ->fields('menu_links')
-    ->condition('router_path', $paths, 'NOT IN')
-    ->condition('external', 0)
-    ->condition('updated', 0)
-    ->condition('customized', 0)
-    ->orderBy('depth', 'DESC')
-    ->execute();
-  // Remove all such items. Starting from those with the greatest depth will
+  // Also as Oracle 11g donot support over 1000 in an expression. Fixed using array_chunck() with 900.
+  // For more info on Oracle issue, visit @ https://www.drupal.org/node/1804084
+  $query = db_select('menu_links')
+    ->fields('menu_links');
+    foreach(array_chunk($paths, 900, true) as $paths_chunk) {
+       $query->condition('router_path', $paths_chunk, 'NOT IN');
+    }
+    $query->condition('external', 0)
+          ->condition('updated', 0)
+          ->condition('customized', 0)
+          ->orderBy('depth', 'DESC');
+  $result = $query->execute();
+    // Remove all such items. Starting from those with the greatest depth will
   // minimize the amount of re-parenting done by menu_link_delete().
   foreach ($result as $item) {
     _menu_delete_item($item, TRUE);
