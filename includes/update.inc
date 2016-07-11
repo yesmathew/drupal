@@ -112,6 +112,13 @@ function update_prepare_d7_bootstrap() {
   // error otherwise.
   $message = '';
   $pdo_link = 'http://drupal.org/requirements/pdo';
+  // PDO Driver Exceptions for Oracle, etc.
+  $pdo_driver = $databases['default']['default']['driver'];
+  switch ($pdo_driver) {
+    case 'oracle':
+        $pdo_driver = 'oci';
+        break;
+  }
   // Check that PDO is loaded.
   if (!extension_loaded('pdo')) {
     $message = '<h2>PDO is required!</h2><p>Drupal 7 requires PHP ' . DRUPAL_MINIMUM_PHP . ' or higher with the PHP Data Objects (PDO) extension enabled.</p>';
@@ -127,8 +134,8 @@ function update_prepare_d7_bootstrap() {
   // the Drupal 7 $databases array themselves but did not do it correctly),
   // this message will be confusing, so do not perform the check; instead, just
   // let the database connection fail in the code that follows.
-  elseif (isset($databases['default']['default']['driver']) && !in_array($databases['default']['default']['driver'], PDO::getAvailableDrivers())) {
-    $message = '<h2>A PDO database driver is required!</h2><p>You need to enable the PDO_' . strtoupper($databases['default']['default']['driver']) . ' database driver for PHP ' . DRUPAL_MINIMUM_PHP . ' or higher so that Drupal 7 can access the database.</p>';
+  elseif (isset($databases['default']['default']['driver']) && !in_array($pdo_driver, PDO::getAvailableDrivers())) {
+    $message = '<h2>A PDO database driver is required!</h2><p>You need to enable the PDO_' . strtoupper($pdo_driver) . ' database driver for PHP ' . DRUPAL_MINIMUM_PHP . ' or higher so that Drupal 7 can access the database.</p>';
   }
   if ($message) {
     print $message . '<p>See the <a href="' . $pdo_link . '">system requirements page</a> for more information.</p>';
